@@ -1,1 +1,7 @@
-/build
+# Android / Gradle build output
+/build/
+/app/build/
+
+# Release artifacts
+*.apk
+*.aab

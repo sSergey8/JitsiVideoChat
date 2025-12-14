@@ -10,8 +10,8 @@ android {
         applicationId "com.example.jitsiapp"
         minSdk 26
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
+        versionCode 1  // Увеличивать каждый раз при обновлении
+        versionName "1.0"  // Увеличивать каждый раз при обновлении
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
