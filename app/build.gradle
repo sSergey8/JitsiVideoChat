@@ -41,3 +41,10 @@ dependencies {
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
 }
+
+android.applicationVariants.all { variant ->
+    variant.outputs.all { output ->
+        def vCode = variant.versionCode
+        outputFileName = "JitsiVideoChat-v${vCode}.apk"
+    }
+}
