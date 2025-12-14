@@ -11,7 +11,7 @@ android {
         minSdk 26
         targetSdk 34
         versionCode 1  // Увеличивать каждый раз при обновлении
-        versionName "1.0"  // Увеличивать каждый раз при обновлении
+        versionName "1.1.1"  // Увеличивать каждый раз при обновлении
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -44,7 +44,6 @@ dependencies {
 
 android.applicationVariants.all { variant ->
     variant.outputs.all { output ->
-        def vCode = variant.versionCode
-        outputFileName = "JitsiVideoChat-v${vCode}.apk"
+        outputFileName = "JitsiVideoChat-v${variant.versionName}.apk"
     }
 }
