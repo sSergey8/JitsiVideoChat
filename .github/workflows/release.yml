@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      - name: Checkout source repo
         uses: actions/checkout@v4
 
-      - name: Set up JDK
+      - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
           distribution: "temurin"
@@ -36,13 +36,31 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: app/build/outputs/apk/release/*.apk
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # ===============================
+      # Publish APK to jitsi-release
+      # ===============================
+      - name: Publish APK to jitsi-release
+        run: |
+          TAG_NAME=${GITHUB_REF_NAME#v}
 
+          APK_PATH=app/build/outputs/apk/release/app-release.apk
+          APK_NAME=JitsiVideoChat-v$TAG_NAME.apk
+
+          mv "$APK_PATH" "$APK_NAME"
+
+          git clone https://x-access-token:${{ secrets.UPDATE_REPO_TOKEN }}@github.com/sSergey8/jitsi-release.git
+          cd jitsi-release
+
+          gh release create v$TAG_NAME ../$APK_NAME \
+            --title "Release v$TAG_NAME" \
+            --notes "Auto release v$TAG_NAME" || \
+          gh release upload v$TAG_NAME ../$APK_NAME --clobber
+        env:
+          GH_TOKEN: ${{ secrets.UPDATE_REPO_TOKEN }}
+
+      # ===============================
+      # Update version.json
+      # ===============================
       - name: Update version.json in jitsi-update
         run: |
           TAG_NAME=${GITHUB_REF_NAME#v}
