@@ -32,6 +32,9 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String VERSION_URL =
             "https://raw.githubusercontent.com/sSergey8/jitsi-update/main/version.json";
+    private volatile boolean isUpdating = false;
+    private String pendingApkUrl = null;
+
 
 
     private int getCurrentVersionCode() {
@@ -118,6 +121,8 @@ public class MainActivity extends AppCompatActivity {
                     .setMessage("Доступна новая версия: " + versionName)
                     .setCancelable(false)
                     .setPositiveButton("Обновить", (dialog, which) -> {
+                        if (isUpdating) return;
+                        isUpdating = true;
                         openApkUrl(apkUrl);
                     })
                     .setNegativeButton("Позже", (dialog, which) -> {
@@ -132,9 +137,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void openApkUrl(String apkUrl) {
         if (!canInstallApk()) {
+            pendingApkUrl = apkUrl;
             requestInstallPermission();
             return;
         }
+
+        runOnUiThread(() -> setContentView(R.layout.activity_update));
 
         new Thread(() -> {
             HttpURLConnection connection = null;
@@ -180,13 +188,15 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
                 String msg = e.getMessage();
 
-                runOnUiThread(() ->
-                        Toast.makeText(
-                                this,
-                                "Ошибка загрузки APK: " + msg,
-                                Toast.LENGTH_LONG
-                        ).show()
-                );
+                runOnUiThread(() -> {
+                    isUpdating = false;
+                    Toast.makeText(
+                            this,
+                            "Ошибка загрузки APK: " + msg,
+                            Toast.LENGTH_LONG
+                    ).show();
+                    startJitsi();
+                });
             } finally {
                 if (connection != null) {
                     connection.disconnect();
@@ -224,6 +234,18 @@ public class MainActivity extends AppCompatActivity {
                     Uri.parse("package:" + getPackageName())
             );
             startActivity(intent);
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+        if (pendingApkUrl != null && canInstallApk()) {
+            String apkUrl = pendingApkUrl;
+            pendingApkUrl = null;
+
+            openApkUrl(apkUrl);
         }
     }
 
