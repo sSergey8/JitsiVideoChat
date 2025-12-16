@@ -36,17 +36,21 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: ./gradlew assembleRelease
 
-      # ===============================
-      # Publish APK to jitsi-release
-      # ===============================
-      - name: Publish APK to jitsi-release
+      - name: Rename APK to versioned name
         run: |
           TAG_NAME=${GITHUB_REF_NAME#v}
 
-          APK_PATH=app/build/outputs/apk/release/app-release.apk
+          APK_PATH=$(ls app/build/outputs/apk/release/*.apk | head -n 1)
           APK_NAME=JitsiVideoChat-v$TAG_NAME.apk
 
-          mv "$APK_PATH" "$APK_NAME"
+          cp "$APK_PATH" "$APK_NAME"
+
+          echo "APK renamed to $APK_NAME"
+
+      - name: Publish APK to jitsi-release
+        run: |
+          TAG_NAME=${GITHUB_REF_NAME#v}
+          APK_NAME=JitsiVideoChat-v$TAG_NAME.apk
 
           git clone https://x-access-token:${{ secrets.UPDATE_REPO_TOKEN }}@github.com/sSergey8/jitsi-release.git
           cd jitsi-release
@@ -58,9 +62,6 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.UPDATE_REPO_TOKEN }}
 
-      # ===============================
-      # Update version.json
-      # ===============================
       - name: Update version.json in jitsi-update
         run: |
           TAG_NAME=${GITHUB_REF_NAME#v}
