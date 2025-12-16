@@ -1,7 +1,21 @@
-# Android / Gradle build output
-/build/
-/app/build/
+# Gradle
+.gradle/
+build/
 
-# Release artifacts
+# Android
+app/build/
+app/release/
 *.apk
 *.aab
+
+# Local config
+local.properties
+
+# IDE
+.idea/
+*.iml
+
+# Keystore
+*.jks
+*.keystore
+keystore_base64.txt
