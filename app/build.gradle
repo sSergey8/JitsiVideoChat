@@ -10,8 +10,8 @@ android {
         applicationId "com.example.jitsiapp"
         minSdk 26
         targetSdk 34
-        versionCode 1  // Увеличивать каждый раз при обновлении
-        versionName "1.1.1"  // Увеличивать каждый раз при обновлении
+        versionCode 2  // Увеличивать каждый раз при обновлении
+        versionName "1.1.2"  // Увеличивать каждый раз при обновлении
 
         // далее в консоли  git tag v1.1.2
         //                  git push --tags
