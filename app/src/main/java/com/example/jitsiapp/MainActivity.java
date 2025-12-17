@@ -3,113 +3,22 @@ package com.example.jitsiapp;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.net.Uri;
-
-import android.os.Environment;
-import java.io.File;
-import java.io.FileOutputStream;
-import java.io.InputStream;
-
-
 import android.os.Bundle;
-
 import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
-
-import androidx.core.content.FileProvider;
-import org.jitsi.meet.sdk.JitsiMeetActivity;
-import org.jitsi.meet.sdk.JitsiMeetConferenceOptions;
+import com.example.jitsiapp.jitsi.JitsiLauncher;
+import com.example.jitsiapp.update.ApkDownloader;
+import com.example.jitsiapp.update.ApkInstaller;
+import com.example.jitsiapp.update.UpdateChecker;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.Random;
+import java.io.File;
 
 public class MainActivity extends AppCompatActivity {
 
     // https://meet.jit.si/my-room-borovichi-2006
-
-    private static final String VERSION_URL =
-            "https://raw.githubusercontent.com/sSergey8/jitsi-update/main/version.json";
     private volatile boolean isUpdating = false;
     private String pendingApkUrl = null;
-
-
-
-    private int getCurrentVersionCode() {
-        try {
-            return getPackageManager()
-                    .getPackageInfo(getPackageName(), 0)
-                    .versionCode;
-        } catch (Exception e) {
-            return 0;
-        }
-    }
-
-    private void checkForUpdate() {
-        new Thread(() -> {
-            try {
-                URL url = new URL(VERSION_URL);
-                HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-                conn.setConnectTimeout(5000);
-                conn.setReadTimeout(5000);
-
-                BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(conn.getInputStream())
-                );
-
-                StringBuilder json = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    json.append(line);
-                }
-                reader.close();
-
-                JSONObject obj = new JSONObject(json.toString());
-
-                int remoteVersion = obj.getInt("versionCode");
-
-                int currentVersion = getCurrentVersionCode();
-
-                runOnUiThread(() -> {
-                    if (remoteVersion > currentVersion) {
-                        showUpdateDialog(obj);
-                    } else {
-                        startJitsi();
-                    }
-                });
-
-            } catch (Exception e) {
-                runOnUiThread(this::startJitsi);
-            }
-        }).start();
-    }
-
-    private void startJitsi() {
-        try {
-            String displayName = "Guest-" + new Random().nextInt(10000);
-
-            URL serverURL = new URL("https://meet.jit.si");
-
-            JitsiMeetConferenceOptions options =
-                    new JitsiMeetConferenceOptions.Builder()
-                            .setServerURL(serverURL)
-                            .setRoom("my-room-borovichi-2006")
-                            .setAudioMuted(false)
-                            .setVideoMuted(false)
-                            .setFeatureFlag("prejoinpage.enabled", false)
-                            .setFeatureFlag("welcomepage.enabled", false)
-                            .setFeatureFlag("call-integration.enabled", false)
-                            .build();
-
-            JitsiMeetActivity.launch(this, options);
-            finish();
-
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
 
     private void showUpdateDialog(JSONObject obj) {
         try {
@@ -123,110 +32,54 @@ public class MainActivity extends AppCompatActivity {
                     .setPositiveButton("Обновить", (dialog, which) -> {
                         if (isUpdating) return;
                         isUpdating = true;
-                        openApkUrl(apkUrl);
+                        startUpdate(apkUrl);
                     })
                     .setNegativeButton("Позже", (dialog, which) -> {
-                        startJitsi();
+                        JitsiLauncher.start(this);
+                        finish();
                     })
                     .show();
 
         } catch (Exception e) {
-            startJitsi();
+            JitsiLauncher.start(this);
+            finish();
         }
     }
-
-    private void openApkUrl(String apkUrl) {
+    private void startUpdate(String apkUrl) {
         if (!canInstallApk()) {
             pendingApkUrl = apkUrl;
             requestInstallPermission();
             return;
         }
 
-        runOnUiThread(() -> setContentView(R.layout.activity_update));
+        setContentView(R.layout.activity_update);
 
-        new Thread(() -> {
-            HttpURLConnection connection = null;
-            try {
-                URL url = new URL(apkUrl);
-                connection = (HttpURLConnection) url.openConnection();
-
-                // ВАЖНО для GitHub
-                connection.setRequestProperty("User-Agent", "Android");
-                connection.setRequestProperty("Accept", "application/octet-stream");
-                connection.setInstanceFollowRedirects(true);
-                connection.setConnectTimeout(10000);
-                connection.setReadTimeout(10000);
-
-                int code = connection.getResponseCode();
-
-                if (code != HttpURLConnection.HTTP_OK) {
-                    throw new RuntimeException("HTTP error code: " + code);
-                }
-
-                InputStream input = connection.getInputStream();
-
-                File apkFile = new File(
-                        getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS),
-                        "update.apk"
-                );
-
-                FileOutputStream output = new FileOutputStream(apkFile);
-
-                byte[] buffer = new byte[8192];
-                int count;
-                while ((count = input.read(buffer)) != -1) {
-                    output.write(buffer, 0, count);
-                }
-
-                output.flush();
-                output.close();
-                input.close();
-
-                runOnUiThread(() -> installApk(apkFile));
-
-            } catch (Exception e) {
-                e.printStackTrace();
-                String msg = e.getMessage();
-
-                runOnUiThread(() -> {
-                    isUpdating = false;
-                    Toast.makeText(
-                            this,
-                            "Ошибка загрузки APK: " + msg,
-                            Toast.LENGTH_LONG
-                    ).show();
-                    startJitsi();
-                });
-            } finally {
-                if (connection != null) {
-                    connection.disconnect();
-                }
+        ApkDownloader.download(this, apkUrl, new ApkDownloader.Callback() {
+            @Override
+            public void onSuccess(File apkFile) {
+                ApkInstaller.install(MainActivity.this, apkFile);
             }
-        }).start();
+
+            @Override
+            public void onError(String message) {
+                isUpdating = false;
+                Toast.makeText(
+                        MainActivity.this,
+                        "Ошибка загрузки APK: " + message,
+                        Toast.LENGTH_LONG
+                ).show();
+
+                JitsiLauncher.start(MainActivity.this);
+                finish();
+            }
+        });
     }
-
-    private void installApk(File apkFile) {
-        Uri apkUri = FileProvider.getUriForFile(
-                this,
-                getPackageName() + ".provider",
-                apkFile
-        );
-
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setDataAndType(apkUri, "application/vnd.android.package-archive");
-        intent.setFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
-        intent.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-
-        startActivity(intent);
-    }
-
     private boolean canInstallApk() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             return getPackageManager().canRequestPackageInstalls();
         }
         return true;
     }
-
     private void requestInstallPermission() {
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
             Intent intent = new Intent(
@@ -245,13 +98,29 @@ public class MainActivity extends AppCompatActivity {
             String apkUrl = pendingApkUrl;
             pendingApkUrl = null;
 
-            openApkUrl(apkUrl);
+            startUpdate(apkUrl);
         }
     }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        checkForUpdate();
+        UpdateChecker.check(this, new UpdateChecker.Callback() {
+            @Override
+            public void onUpdateAvailable(JSONObject json) {
+                showUpdateDialog(json);
+            }
+            @Override
+            public void onUpToDate() {
+                JitsiLauncher.start(MainActivity.this);
+                finish();
+            }
+            @Override
+            public void onError() {
+                JitsiLauncher.start(MainActivity.this);
+                finish();
+            }
+        });
     }
+
 }
